@@ -1,8 +1,13 @@
+
 const prisma = require("../config/db");
 const AppError = require("../utils/AppError");
 const asyncHandler = require("../utils/asyncHandler");
 
 const validateDoctorData = (data, isUpdate = false) => {
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+        throw new AppError("Request body must be a JSON object", 400);
+    }
+
     const allowedFields = ["name", "specialty", "email", "phone"];
 
     for (const key of Object.keys(data)) {
@@ -12,16 +17,26 @@ const validateDoctorData = (data, isUpdate = false) => {
     }
 
     for (const field of ["name", "specialty"]) {
-        if (!isUpdate && (typeof data[field] !== "string" || !data[field].trim())) {
+        if (
+            !isUpdate &&
+            (typeof data[field] !== "string" || !data[field].trim())
+        ) {
             throw new AppError(`${field} is required`, 400);
         }
 
         if (data[field] !== undefined) {
             if (typeof data[field] !== "string" || !data[field].trim()) {
-                throw new AppError(`${field} must be a non-empty string`, 400);
+                throw new AppError(
+                    `${field} must be a non-empty string`,
+                    400
+                );
             }
+
             if (data[field].trim().length > 100) {
-                throw new AppError(`${field} cannot exceed 100 characters`, 400);
+                throw new AppError(
+                    `${field} cannot exceed 100 characters`,
+                    400
+                );
             }
         }
     }
@@ -31,9 +46,14 @@ const validateDoctorData = (data, isUpdate = false) => {
             throw new AppError("Email must be a string", 400);
         }
 
+        const email = data.email.trim();
+
         if (
-            data.email.trim() &&
-            !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim())
+            email &&
+            (
+                email.length > 254 ||
+                !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+            )
         ) {
             throw new AppError("Please provide a valid doctor email", 400);
         }
@@ -43,12 +63,12 @@ const validateDoctorData = (data, isUpdate = false) => {
         if (typeof data.phone !== "string") {
             throw new AppError("Phone must be a string", 400);
         }
+
         if (data.phone.length > 30) {
             throw new AppError("Phone cannot exceed 30 characters", 400);
         }
     }
 };
-
 
 const createDoctor = asyncHandler(async (req, res) => {
     validateDoctorData(req.body);
@@ -61,6 +81,15 @@ const createDoctor = asyncHandler(async (req, res) => {
             specialty: specialty.trim(),
             email: email?.trim().toLowerCase() || null,
             phone: phone?.trim() || null
+        },
+        select: {
+            id: true,
+            name: true,
+            specialty: true,
+            email: true,
+            phone: true,
+            createdAt: true,
+            updatedAt: true
         }
     });
 
@@ -71,10 +100,20 @@ const createDoctor = asyncHandler(async (req, res) => {
     });
 });
 
-
 const getDoctors = asyncHandler(async (req, res) => {
     const doctors = await prisma.doctor.findMany({
-        orderBy: { createdAt: "desc" }
+        select: {
+            id: true,
+            name: true,
+            specialty: true,
+            email: true,
+            phone: true,
+            createdAt: true,
+            updatedAt: true
+        },
+        orderBy: {
+            createdAt: "desc"
+        }
     });
 
     res.status(200).json({
@@ -84,23 +123,17 @@ const getDoctors = asyncHandler(async (req, res) => {
     });
 });
 
-
 const getDoctor = asyncHandler(async (req, res) => {
     const doctor = await prisma.doctor.findUnique({
         where: { id: req.recordId },
-        include: {
-            mappings: {
-                include: {
-                    patient: {
-                        select: {
-                            id: true,
-                            name: true,
-                            age: true,
-                            gender: true
-                        }
-                    }
-                }
-            }
+        select: {
+            id: true,
+            name: true,
+            specialty: true,
+            email: true,
+            phone: true,
+            createdAt: true,
+            updatedAt: true
         }
     });
 
@@ -113,7 +146,6 @@ const getDoctor = asyncHandler(async (req, res) => {
         doctor
     });
 });
-
 
 const updateDoctor = asyncHandler(async (req, res) => {
     validateDoctorData(req.body, true);
@@ -133,7 +165,9 @@ const updateDoctor = asyncHandler(async (req, res) => {
     const data = { ...req.body };
 
     for (const field of ["name", "specialty"]) {
-        if (data[field] !== undefined) data[field] = data[field].trim();
+        if (data[field] !== undefined) {
+            data[field] = data[field].trim();
+        }
     }
 
     if (data.email !== undefined) {
@@ -146,7 +180,16 @@ const updateDoctor = asyncHandler(async (req, res) => {
 
     const doctor = await prisma.doctor.update({
         where: { id: req.recordId },
-        data
+        data,
+        select: {
+            id: true,
+            name: true,
+            specialty: true,
+            email: true,
+            phone: true,
+            createdAt: true,
+            updatedAt: true
+        }
     });
 
     res.status(200).json({
@@ -155,7 +198,6 @@ const updateDoctor = asyncHandler(async (req, res) => {
         doctor
     });
 });
-
 
 const deleteDoctor = asyncHandler(async (req, res) => {
     const doctor = await prisma.doctor.findUnique({
