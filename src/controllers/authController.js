@@ -16,7 +16,7 @@ const createToken = (user) => {
     );
 };
 
-// register
+
 const registerUser = asyncHandler(async (req, res) => {
     const { name, email, password } = req.body;
 
@@ -79,7 +79,7 @@ const registerUser = asyncHandler(async (req, res) => {
     });
 });
 
-// log
+
 const loginUser = asyncHandler(async (req, res) => {
     const { email, password } = req.body;
 
